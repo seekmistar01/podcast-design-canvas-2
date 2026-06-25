@@ -1,7 +1,7 @@
 "use strict";
 
 // Browser wiring for episode setup (#1), audio polish (#15), preset style (#4),
-// and canvas editor (#11).
+// canvas editor (#11), and visual moments (#19).
 (function () {
   const ES = window.PdcEpisodeSetup;
   const STY = window.PdcEpisodeStyle;
@@ -9,6 +9,7 @@
   const CL = window.PdcCanvasLayers;
   const CE = window.PdcCanvasEditor;
   const TM = window.PdcShowTemplates;
+  const VM = window.PdcVisualMoments;
   const root = document.getElementById("app");
   const stepPill = document.querySelector(".step-pill");
   if (!ES || !root) {
@@ -30,6 +31,30 @@
   let canvasDoc = null;
   let canvasLayerCounter = 20;
   let workspaceSummaryCache = null;
+  // Visual moments (#19): kept across navigation and mirrored to localStorage so the
+  // creator's caption/title/b-roll/callout edits survive leaving and re-opening.
+  const MOMENTS_STORAGE_KEY = "pdc-visual-moments";
+  let momentsBoard = null;
+  let selectedMomentId = null;
+
+  function safeLoadMoments() {
+    try {
+      return typeof localStorage !== "undefined" ? localStorage.getItem(MOMENTS_STORAGE_KEY) : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function persistMoments() {
+    if (!VM || typeof localStorage === "undefined" || !momentsBoard) {
+      return;
+    }
+    try {
+      localStorage.setItem(MOMENTS_STORAGE_KEY, VM.serialize(momentsBoard));
+    } catch (err) {
+      /* ignore quota errors */
+    }
+  }
 
   function safeLoadTemplates() {
     try {
@@ -556,6 +581,24 @@
       }
     }
 
+    // Visual moments summary (after the creator has placed captions/titles/b-roll/callouts)
+    if (VM && momentsBoard && momentsBoard.moments.length) {
+      const ms = VM.summarizeBoard(momentsBoard);
+      view.appendChild(
+        el(
+          "section",
+          { class: "card moments-summary" },
+          el("h3", {}, "Visual moments"),
+          el(
+            "p",
+            { class: "moments-summary-count" },
+            `${ms.momentCount} moment${ms.momentCount === 1 ? "" : "s"} across the episode`,
+          ),
+          el("p", { class: "hint" }, ms.treatmentLine),
+        ),
+      );
+    }
+
     // Episode review / export path
     if (AP && appliedAudioPolish) {
       const templateName = activeTemplateId && TM
@@ -637,6 +680,19 @@
       if (appliedAudioPolish) {
         actions.appendChild(audioButton);
       }
+    }
+    // Visual moments — the contextual editing stage, available once a style is set.
+    const momentsAvailable = Boolean(VM && appliedStyle);
+    if (VM) {
+      const momentsButton = el(
+        "button",
+        { type: "button", class: "ghost", disabled: momentsAvailable ? null : true },
+        momentsBoard && momentsBoard.moments.length ? "Edit visual moments →" : "Add visual moments →",
+      );
+      if (momentsAvailable) {
+        momentsButton.addEventListener("click", () => openMomentsEditor(summary));
+      }
+      actions.appendChild(momentsButton);
     }
     actions.appendChild(
       (function () {
@@ -727,6 +783,256 @@
       canvasDoc = CE.createFromStyle(appliedStyle, summary, styleSelection);
     }
     renderCanvasEditor(summary);
+  }
+
+  // ---- Visual moments editor (#19) --------------------------------------------
+
+  function openMomentsEditor(summary) {
+    workspaceSummaryCache = summary;
+    if (!momentsBoard) {
+      const restored = VM.deserialize(safeLoadMoments());
+      momentsBoard = restored && restored.episodeName === (summary.episodeName || "")
+        ? restored
+        : VM.createBoard(summary);
+    }
+    if (!selectedMomentId && momentsBoard.moments.length) {
+      selectedMomentId = VM.orderedMoments(momentsBoard)[0].id;
+    }
+    renderMomentsEditor(summary);
+  }
+
+  function speakerRoleOptions() {
+    const roles = [];
+    (momentsBoard.timeline || []).forEach((seg) => {
+      if (roles.indexOf(seg.speakerRole) === -1) {
+        roles.push(seg.speakerRole);
+      }
+    });
+    return roles;
+  }
+
+  function renderMomentRow(moment, summary) {
+    const type = VM.getMomentType(moment.type);
+    const row = el("div", {
+      class: `moment-row moment-${moment.type}${moment.id === selectedMomentId ? " selected" : ""}${moment.visible ? "" : " hidden"}`,
+    });
+
+    row.appendChild(
+      el(
+        "div",
+        { class: "moment-row-head" },
+        el("span", { class: "moment-type-pill" }, type.label),
+        el("span", { class: "moment-tc" }, VM.formatTimecode(moment.atSeconds)),
+      ),
+    );
+
+    const textInput = el("input", {
+      type: "text",
+      class: "moment-text",
+      value: moment.text,
+      "aria-label": `${type.label} text`,
+    });
+    textInput.addEventListener("change", () => {
+      momentsBoard = VM.updateMoment(momentsBoard, moment.id, { text: textInput.value });
+      persistMoments();
+      renderMomentsEditor(summary);
+    });
+    row.appendChild(field(`${type.label} text`, textInput));
+
+    const timeInput = el("input", {
+      type: "text",
+      class: "moment-time",
+      value: VM.formatTimecode(moment.atSeconds),
+      "aria-label": "Timing",
+    });
+    timeInput.addEventListener("change", () => {
+      momentsBoard = VM.updateMoment(momentsBoard, moment.id, { atSeconds: VM.parseTimecode(timeInput.value) });
+      persistMoments();
+      renderMomentsEditor(summary);
+    });
+
+    const speakerSelect = el("select", { class: "moment-speaker", "aria-label": "Speaker" });
+    const roles = speakerRoleOptions();
+    if (roles.indexOf(moment.speakerRole) === -1) {
+      roles.push(moment.speakerRole);
+    }
+    roles.forEach((role) => {
+      speakerSelect.appendChild(
+        el("option", { value: role, selected: role === moment.speakerRole ? true : null }, role),
+      );
+    });
+    speakerSelect.addEventListener("change", () => {
+      momentsBoard = VM.updateMoment(momentsBoard, moment.id, { speakerRole: speakerSelect.value });
+      persistMoments();
+      renderMomentsEditor(summary);
+    });
+
+    row.appendChild(
+      el(
+        "div",
+        { class: "moment-controls" },
+        field("Timing (mm:ss)", timeInput),
+        field("Speaker", speakerSelect),
+      ),
+    );
+
+    const previewBtn = el("button", { type: "button", class: "ghost canvas-tiny" }, "Preview");
+    previewBtn.addEventListener("click", () => {
+      selectedMomentId = moment.id;
+      renderMomentsEditor(summary);
+    });
+    const visBtn = el("button", { type: "button", class: "ghost canvas-tiny" }, moment.visible ? "Hide" : "Show");
+    visBtn.addEventListener("click", () => {
+      momentsBoard = VM.toggleVisibility(momentsBoard, moment.id);
+      persistMoments();
+      renderMomentsEditor(summary);
+    });
+    const delBtn = el("button", { type: "button", class: "ghost canvas-tiny" }, "Remove");
+    delBtn.addEventListener("click", () => {
+      momentsBoard = VM.removeMoment(momentsBoard, moment.id);
+      if (selectedMomentId === moment.id) {
+        selectedMomentId = null;
+      }
+      persistMoments();
+      renderMomentsEditor(summary);
+    });
+    row.appendChild(el("div", { class: "moment-actions" }, previewBtn, visBtn, delBtn));
+    return row;
+  }
+
+  function renderMomentsPreview(board) {
+    const card = el("section", { class: "card moments-preview" }, el("h3", {}, "Moment preview"));
+    if (!selectedMomentId || !VM.findMoment(board, selectedMomentId)) {
+      card.appendChild(
+        el("p", { class: "hint" }, "Select a moment to preview how it changes the episode look."),
+      );
+      return card;
+    }
+    const preview = VM.previewMoment(board, selectedMomentId);
+    const stage = el("div", { class: `moments-stage moment-${preview.type}${preview.visible ? "" : " hidden"}` });
+    stage.appendChild(
+      el(
+        "div",
+        { class: "moments-stage-speakers" },
+        el("span", { class: "preview-role" }, preview.speakerRole),
+        el("span", { class: "preview-name" }, preview.speakerName || ""),
+      ),
+    );
+    stage.appendChild(
+      el(
+        "div",
+        { class: `moments-overlay overlay-${preview.type}` },
+        el("span", { class: "moments-overlay-kind" }, preview.label),
+        el("span", { class: "moments-overlay-text" }, preview.text),
+      ),
+    );
+    card.appendChild(stage);
+    card.appendChild(el("p", { class: "moments-effect" }, preview.effect));
+    card.appendChild(el("p", { class: "hint" }, `${preview.timecode} · ${preview.visibility}`));
+    return card;
+  }
+
+  function renderMomentsEditor(summary) {
+    root.innerHTML = "";
+    setStep("Step 6 of 6 · Visual moments");
+    const board = momentsBoard;
+
+    const view = el("div", { class: "moments-editor" });
+    view.appendChild(
+      el(
+        "div",
+        { class: "workspace-head" },
+        el("p", { class: "eyebrow" }, "Visual moments"),
+        el("h2", {}, "Add captions, titles, b-roll & callouts"),
+        el(
+          "p",
+          { class: "hint" },
+          "Move through the episode and place polished visual treatments at the moments that matter. Edits save automatically.",
+        ),
+      ),
+    );
+
+    const addRow = el("div", { class: "moments-add" });
+    VM.MOMENT_TYPES.forEach((type) => {
+      const btn = el("button", { type: "button", class: "ghost moments-add-btn", title: type.note }, `+ ${type.label}`);
+      btn.addEventListener("click", () => {
+        momentsBoard = VM.addMoment(momentsBoard, type.id);
+        selectedMomentId = momentsBoard.moments[momentsBoard.moments.length - 1].id;
+        persistMoments();
+        renderMomentsEditor(summary);
+      });
+      addRow.appendChild(btn);
+    });
+    view.appendChild(
+      el(
+        "section",
+        { class: "card moments-add-card" },
+        el("h3", {}, "Add a moment"),
+        el("p", { class: "hint" }, "Pick a treatment to drop onto the timeline, then fine-tune its timing and text."),
+        addRow,
+      ),
+    );
+
+    const grid = el("div", { class: "moments-grid" });
+
+    const timelineCard = el(
+      "section",
+      { class: "card moments-timeline" },
+      el("h3", {}, `Episode timeline · ${VM.formatTimecode(board.durationSeconds)}`),
+    );
+    const ordered = VM.orderedMoments(board);
+    board.timeline.forEach((seg) => {
+      const segEl = el(
+        "div",
+        { class: "timeline-seg" },
+        el(
+          "div",
+          { class: "timeline-seg-head" },
+          el("span", { class: "timeline-tc" }, VM.formatTimecode(seg.startSeconds)),
+          el("span", { class: "role-pill" }, seg.speakerRole),
+          el("span", { class: "timeline-name" }, seg.speakerName),
+        ),
+        el("p", { class: "timeline-transcript" }, seg.transcript),
+      );
+      ordered
+        .filter((moment) => moment.atSeconds >= seg.startSeconds && moment.atSeconds < seg.endSeconds)
+        .forEach((moment) => segEl.appendChild(renderMomentRow(moment, summary)));
+      timelineCard.appendChild(segEl);
+    });
+    if (!ordered.length) {
+      timelineCard.appendChild(
+        el("p", { class: "hint" }, "No moments yet — add a caption, title, b-roll, or callout above."),
+      );
+    }
+    grid.appendChild(timelineCard);
+    grid.appendChild(renderMomentsPreview(board));
+    view.appendChild(grid);
+
+    const sum = VM.summarizeBoard(board);
+    view.appendChild(
+      el(
+        "section",
+        { class: "card moments-foot" },
+        el(
+          "p",
+          { class: "moments-summary-count" },
+          `${sum.momentCount} moment${sum.momentCount === 1 ? "" : "s"} · ${sum.visibleCount} visible`,
+        ),
+        el("p", { class: "hint" }, sum.treatmentLine),
+      ),
+    );
+
+    const done = el("button", { type: "button", class: "primary" }, "Save & back to workspace");
+    done.addEventListener("click", () => {
+      persistMoments();
+      renderWorkspace(summary);
+    });
+    const back = el("button", { type: "button", class: "ghost" }, "← Back to workspace");
+    back.addEventListener("click", () => renderWorkspace(summary));
+    view.appendChild(el("div", { class: "actions" }, done, back));
+
+    root.appendChild(view);
+    view.scrollIntoView({ block: "start" });
   }
 
   // ---- Canvas editor (#11) ----------------------------------------------------

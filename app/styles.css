@@ -992,3 +992,218 @@ button:disabled {
   font-weight: 600;
   color: var(--ok);
 }
+
+/* ---- Visual moments editor (#19) ---- */
+.moments-editor {
+  display: grid;
+  gap: 18px;
+}
+
+.moments-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.moments-add-btn {
+  font-weight: 600;
+}
+
+.moments-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .moments-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.timeline-seg {
+  border-left: 3px solid var(--line);
+  padding: 8px 0 8px 14px;
+  margin: 0 0 6px;
+}
+
+.timeline-seg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timeline-tc {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--brand);
+  font-size: 13px;
+}
+
+.timeline-name {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.timeline-transcript {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.moment-row {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  background: #fcfcff;
+}
+
+.moment-row.selected {
+  box-shadow: 0 0 0 2px var(--brand);
+}
+
+.moment-row.hidden {
+  opacity: 0.55;
+}
+
+.moment-row.moment-broll {
+  border-left-color: var(--accent);
+}
+
+.moment-row.moment-callout {
+  border-left-color: #1f9d6b;
+}
+
+.moment-row.moment-title {
+  border-left-color: #a15c00;
+}
+
+.moment-row.moment-note {
+  border-left-color: var(--ink-soft);
+}
+
+.moment-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.moment-type-pill {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+}
+
+.moment-tc {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.moment-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.moment-text,
+.moment-time,
+.moment-speaker {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.moment-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.moments-stage {
+  position: relative;
+  border-radius: 12px;
+  min-height: 150px;
+  background: #10131f;
+  color: #fff;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.moments-stage.hidden {
+  filter: grayscale(0.7);
+  opacity: 0.6;
+}
+
+.moments-stage-speakers {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.moments-stage-speakers .preview-role {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.moments-overlay {
+  background: rgba(108, 76, 255, 0.92);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 90%;
+}
+
+.moments-overlay.overlay-broll {
+  background: rgba(255, 122, 89, 0.92);
+}
+
+.moments-overlay.overlay-callout {
+  background: rgba(31, 157, 107, 0.92);
+}
+
+.moments-overlay.overlay-title {
+  background: rgba(161, 92, 0, 0.92);
+}
+
+.moments-overlay.overlay-note {
+  background: rgba(91, 93, 119, 0.92);
+}
+
+.moments-overlay-kind {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.moments-overlay-text {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.moments-effect {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.moments-summary-count {
+  font-weight: 700;
+  margin: 0 0 4px;
+}

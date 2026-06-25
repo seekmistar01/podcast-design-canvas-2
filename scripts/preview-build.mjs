@@ -14,6 +14,7 @@ const required = [
   "app/canvas-layers.js",
   "app/canvas-editor.js",
   "app/show-templates.js",
+  "app/visual-moments.js",
   "app/episode-setup.ui.js",
 ];
 
@@ -37,6 +38,7 @@ for (const file of [
   "app/canvas-layers.js",
   "app/canvas-editor.js",
   "app/show-templates.js",
+  "app/visual-moments.js",
   "app/episode-setup.ui.js",
 ]) {
   if (!existsSync(file)) {
@@ -59,6 +61,7 @@ if (existsSync("index.html")) {
     "app/canvas-layers.js",
     "app/canvas-editor.js",
     "app/show-templates.js",
+    "app/visual-moments.js",
     "app/episode-setup.ui.js",
     'id="app"',
   ]) {
