@@ -75,7 +75,7 @@ function foundersShow(store) {
   });
 }
 
-test("buildSetupDraft prefills episode name, host speakers, and social context", () => {
+test("buildSetupDraft prefills episode name, real speaker names, and social context", () => {
   library._resetCounters();
   const show = foundersShow(templateStoreForShow());
   show.episodes = [{ id: "ep-1", name: "Pilot" }];
@@ -84,6 +84,7 @@ test("buildSetupDraft prefills episode name, host speakers, and social context",
   assert.strictEqual(draft.sourceMode, "riverside");
   assert.strictEqual(draft.riversideLink, "https://riverside.fm/studio/founders");
   assert.strictEqual(draft.speakers[0].name, "Sam Rivera");
+  assert.strictEqual(draft.speakers[1].name, "Dana Kim");
   assert.strictEqual(draft.speakers[0].social.twitter, "https://x.com/samrivera");
   assert.strictEqual(setup.summarize(draft).socialLinkCount, 3);
 });

@@ -713,7 +713,7 @@
       { class: "card show-identity-banner" },
       el("h3", {}, showIdentitySummary.headline),
       el("p", { class: "hint" }, showIdentitySummary.identityLine),
-      el("p", { class: "hint show-identity-note" }, "Everything below is prefilled from this show — edit any step as needed."),
+      el("p", { class: "hint show-identity-note" }, "Show context is above — enter each speaker's name and recording source below."),
     );
   }
 
@@ -754,6 +754,12 @@
     startingFromShowIdentity = Boolean(start.fromShowIdentity);
     showIdentitySummary = start.identity || null;
     state = start.setupDraft || ES.createDraft();
+    if (SI) {
+      const showForSanitize = activeShowId && LIB
+        ? LIB.getShow(showLibrary, activeShowId)
+        : (start.showName ? { name: start.showName, episodes: [] } : null);
+      state = SI.sanitizeSetupDraft(state, showForSanitize);
+    }
     styleSelection = start.styleSelection || (STY ? STY.createSelection() : null);
     appliedStyle = start.appliedStyle || null;
     activeTemplateId = start.templateId || null;
@@ -797,7 +803,78 @@
 
   // ---- Setup view -------------------------------------------------------------
 
+  function showContextForSanitize() {
+    if (activeShowId && LIB) {
+      return LIB.getShow(showLibrary, activeShowId);
+    }
+    if (startingFromShowIdentity && showIdentitySummary && showIdentitySummary.headline) {
+      const match = showIdentitySummary.headline.match(/^Starting from (.+) identity$/);
+      if (match) {
+        return { name: match[1], episodes: [] };
+      }
+    }
+    return null;
+  }
+
+  function sanitizeSetupState() {
+    if (!SI) {
+      return;
+    }
+    state = SI.sanitizeSetupDraft(state, showContextForSanitize());
+  }
+
+  function readSetupFormState() {
+    const episodeInput = document.getElementById("f-episodeName");
+    if (episodeInput) {
+      state.episodeName = episodeInput.value;
+    }
+    const linkInput = document.getElementById("f-riversideLink");
+    if (linkInput) {
+      state.riversideLink = linkInput.value;
+    }
+    state.speakers.forEach((speaker, index) => {
+      const nameInput = document.getElementById(`f-sp-${index}-name`);
+      if (nameInput) {
+        speaker.name = nameInput.value;
+      }
+      const trackInput = document.getElementById(`f-sp-${index}-source`);
+      if (trackInput && trackInput.type === "text") {
+        speaker.trackLabel = trackInput.value;
+      }
+      ES.SOCIAL_NETWORKS.forEach((net) => {
+        const socialInput = document.getElementById(`f-sp-${index}-social-${net.key}`);
+        if (socialInput) {
+          speaker.social[net.key] = socialInput.value;
+        }
+      });
+    });
+    sanitizeSetupState();
+  }
+
+  function clearSpeakerAutofillLeak() {
+    if (!SI) {
+      return;
+    }
+    const show = showContextForSanitize();
+    state.speakers.forEach((speaker, index) => {
+      const nameInput = document.getElementById(`f-sp-${index}-name`);
+      if (nameInput && !trim(speaker.name) && SI.isShowContextLabel(nameInput.value, show, state)) {
+        nameInput.value = "";
+      }
+      const trackInput = document.getElementById(`f-sp-${index}-source`);
+      if (trackInput && trackInput.type === "text" && !trim(speaker.trackLabel)
+        && SI.isShowContextLabel(trackInput.value, show, state)) {
+        trackInput.value = "";
+      }
+    });
+  }
+
+  function trim(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
   function renderSetup() {
+    sanitizeSetupState();
     setPageIntro("episode-setup");
     root.innerHTML = "";
     setStep("Step 1 of 8 · Set up episode");
@@ -865,6 +942,7 @@
     });
     nameInput.addEventListener("input", (e) => {
       state.episodeName = e.target.value;
+      sanitizeSetupState();
     });
 
     const detailsCard = el(
@@ -942,7 +1020,9 @@
 
     const addButton = el("button", { type: "button", class: "ghost" }, "+ Add speaker source");
     addButton.addEventListener("click", () => {
+      readSetupFormState();
       state.speakers.push(ES.createSpeaker(nextRole()));
+      sanitizeSetupState();
       renderSetup();
     });
     speakersCard.appendChild(addButton);
@@ -967,6 +1047,7 @@
     );
 
     root.appendChild(form);
+    clearSpeakerAutofillLeak();
     const backShow = document.getElementById("setup-back-show");
     if (backShow) {
       backShow.addEventListener("click", () => renderShowDetail(activeShowId));
@@ -992,7 +1073,9 @@
     }, "Remove");
     removeButton.addEventListener("click", () => {
       if (state.speakers.length > 1) {
+        readSetupFormState();
         state.speakers.splice(index, 1);
+        sanitizeSetupState();
         renderSetup();
       }
     });
@@ -1007,7 +1090,9 @@
       id: `f-sp-${index}-name`,
       type: "text",
       value: speaker.name,
-      placeholder: "Speaker name",
+      placeholder: "Enter speaker name",
+      autocomplete: "off",
+      "data-lpignore": "true",
       "aria-invalid": isInvalid(`speaker:${index}:name`) ? "true" : null,
     });
     nameInput.addEventListener("input", (e) => {
@@ -1058,6 +1143,8 @@
         type: "text",
         value: speaker.trackLabel,
         placeholder: "e.g. Track 1 (optional)",
+        autocomplete: "off",
+        "data-lpignore": "true",
       });
       trackInput.addEventListener("input", (e) => {
         speaker.trackLabel = e.target.value;

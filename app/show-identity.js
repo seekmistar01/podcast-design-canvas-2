@@ -53,23 +53,82 @@
     return `${base} — Episode ${nextNumber}`;
   }
 
+  function isShowContextLabel(text, show, draft) {
+    const trimmed = trim(text);
+    if (!trimmed) {
+      return false;
+    }
+    const showName = show && trim(show.name);
+    const episodeName = draft && trim(draft.episodeName);
+    const lowered = trimmed.toLowerCase();
+    if (showName && lowered === showName.toLowerCase()) {
+      return true;
+    }
+    if (episodeName && lowered === episodeName.toLowerCase()) {
+      return true;
+    }
+    if (show && lowered === trim(suggestedEpisodeName(show)).toLowerCase()) {
+      return true;
+    }
+    if (episodeName) {
+      const episodeStem = trim(episodeName.split("—")[0]);
+      if (episodeStem && lowered === episodeStem.toLowerCase()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function speakerNameForImport(item, show, draft) {
+    const name = trim(item && item.name);
+    if (!name || isShowContextLabel(name, show, draft)) {
+      return "";
+    }
+    return name;
+  }
+
+  function trackLabelForImport(item, show, draft) {
+    const label = trim(item && item.trackLabel);
+    if (!label || isShowContextLabel(label, show, draft)) {
+      return "";
+    }
+    return label;
+  }
+
+  function sanitizeSpeaker(speaker, show, draft) {
+    const next = clone(speaker || {});
+    if (isShowContextLabel(next.name, show, draft)) {
+      next.name = "";
+    }
+    if (isShowContextLabel(next.trackLabel, show, draft)) {
+      next.trackLabel = "";
+    }
+    return next;
+  }
+
+  function sanitizeSetupDraft(draft, show) {
+    const next = clone(draft || setupApi().createDraft());
+    next.speakers = (next.speakers || []).map((speaker) => sanitizeSpeaker(speaker, show, next));
+    return next;
+  }
+
   function applyDefaultSpeakers(draft, show) {
     const ES = setupApi();
     const next = clone(draft || ES.createDraft());
     const defaults = show && Array.isArray(show.defaultSpeakers) ? show.defaultSpeakers : [];
     if (!defaults.length) {
-      return next;
+      return sanitizeSetupDraft(next, show);
     }
     next.speakers = defaults.map((item) => {
       const speaker = ES.createSpeaker(item.role || "Host");
-      speaker.name = trim(item.name);
-      speaker.trackLabel = trim(item.trackLabel);
+      speaker.name = speakerNameForImport(item, show, next);
+      speaker.trackLabel = trackLabelForImport(item, show, next);
       if (item.social && typeof item.social === "object") {
         speaker.social = Object.assign({}, speaker.social, item.social);
       }
       return speaker;
     });
-    return next;
+    return sanitizeSetupDraft(next, show);
   }
 
   function buildSetupDraft(show) {
@@ -231,6 +290,11 @@
 
   const api = {
     suggestedEpisodeName,
+    isShowContextLabel,
+    speakerNameForImport,
+    trackLabelForImport,
+    sanitizeSpeaker,
+    sanitizeSetupDraft,
     buildSetupDraft,
     resolveStyleSelection,
     resolveTemplate,
