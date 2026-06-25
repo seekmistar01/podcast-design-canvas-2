@@ -15,6 +15,7 @@ const required = [
   "app/canvas-layers.js",
   "app/canvas-editor.js",
   "app/show-templates.js",
+  "app/creator-template-gallery.js",
   "app/visual-moments.js",
   "app/social-context.js",
   "app/episode-export.js",
@@ -51,6 +52,7 @@ for (const file of [
   "app/canvas-layers.js",
   "app/canvas-editor.js",
   "app/show-templates.js",
+  "app/creator-template-gallery.js",
   "app/visual-moments.js",
   "app/social-context.js",
   "app/episode-export.js",
@@ -86,6 +88,7 @@ if (existsSync("index.html")) {
     "app/canvas-layers.js",
     "app/canvas-editor.js",
     "app/show-templates.js",
+    "app/creator-template-gallery.js",
     "app/episode-setup.ui.js",
     'id="app"',
   ]) {
