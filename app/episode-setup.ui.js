@@ -611,30 +611,121 @@
     root.appendChild(view);
   }
 
-  function renderNewShowForm(prefillName, errorMsg) {
+  // Compact, brand-kit-free preview for the Create Show preset cards (#94). Uses generic
+  // Host / Guest placeholder frames since no episode speakers exist yet, so the preview
+  // reflects the chosen preset's palette, layout, pacing, and caption treatment and
+  // updates whenever a different preset card is selected.
+  function buildShowStylePreview(presetId) {
+    if (!STY) {
+      return el("p", { class: "hint" }, "Preview unavailable.");
+    }
+    const selection = STY.applyPresetToSelection(STY.createSelection(), presetId, false);
+    const preset = STY.getPreset(presetId);
+    const pacing = STY.getPacing(selection.pacing);
+    const speakers = [
+      { role: "Host", name: "Host" },
+      { role: "Guest 1", name: "Guest 1" },
+      { role: "Guest 2", name: "Guest 2" },
+    ];
+    const frames = STY.buildPreviewFrames(speakers, selection, speakers.length);
+    const layoutId = STY.resolveLayout(selection, speakers.length);
+
+    const stage = el("div", { class: `preview-stage stage-${layoutId} pacing-${pacing.id}` });
+    stage.style.background = preset.background;
+    stage.style.color = preset.textColor;
+
+    const frameWrap = el("div", { class: "preview-frames" });
+    frames.forEach((frame) => {
+      const frameEl = el(
+        "div",
+        { class: `preview-frame${frame.active ? " active" : ""}` },
+        el("span", { class: "preview-role" }, frame.role),
+        el("span", { class: "preview-name" }, frame.name),
+      );
+      frameEl.style.borderColor = preset.accent;
+      if (frame.active) {
+        frameEl.style.boxShadow = `0 0 0 2px ${preset.accent}`;
+      }
+      frameWrap.appendChild(frameEl);
+    });
+    stage.appendChild(frameWrap);
+
+    const caption = el(
+      "div",
+      { class: "preview-caption" },
+      el("span", { class: "preview-caption-text" }, "Sample caption — this is how on-screen text will look."),
+    );
+    caption.style.background = preset.accent;
+    stage.appendChild(caption);
+
+    const foot = el(
+      "p",
+      { class: "preview-foot" },
+      [`${pacing.label} pacing`, preset.captionStyle, STY.getLayout(layoutId).label].join(" · "),
+    );
+    return el("div", { class: "create-show-preview-body" }, stage, foot);
+  }
+
+  function renderNewShowForm(prefillName, errorMsg, prefillPresetId) {
     setPageIntro("new-show");
     root.innerHTML = "";
     setStep("Show Library · New Show");
 
-    const saved = TM ? TM.listTemplates(templateStore) : [];
+    const presets = STY && STY.STYLE_PRESETS ? STY.STYLE_PRESETS : [];
+    const selectedPresetId = prefillPresetId || (presets[0] ? presets[0].id : "");
 
     const nameInput = el("input", { id: "f-show-name", type: "text", value: prefillName || "", placeholder: "e.g. Founders Unfiltered" });
-
-    let selectedTemplateId = "";
-    let selectedPresetName = "";
-    const tplOptions = [el("option", { value: "" }, "No template")].concat(
-      saved.map((t) => el("option", { value: t.id }, t.name)),
-    );
-    const tplSelect = el("select", { id: "f-show-template" }, ...tplOptions);
-    tplSelect.addEventListener("change", () => {
-      selectedTemplateId = tplSelect.value;
-      const tpl = saved.find((t) => t.id === selectedTemplateId);
-      selectedPresetName = tpl && tpl.presetName ? tpl.presetName : "";
-    });
 
     if (errorMsg) {
       root.appendChild(el("div", { class: "banner", role: "alert" }, errorMsg));
     }
+
+    // Visual preset cards replace the old native style dropdown (#94): each card shows the
+    // style name, a palette swatch, and its layout/caption cues; the chosen card is clearly
+    // highlighted; and the preview to the right updates to match the selected preset.
+    const presetGrid = el("div", { class: "preset-grid create-show-preset-grid" });
+    presets.forEach((preset) => {
+      const selected = preset.id === selectedPresetId;
+      const swatch = el("span", { class: "preset-swatch" });
+      swatch.style.background = preset.background;
+      swatch.style.borderColor = preset.accent;
+      const dot = el("span", { class: "preset-swatch-dot" });
+      dot.style.background = preset.accent;
+      swatch.appendChild(dot);
+      const card = el(
+        "button",
+        {
+          type: "button",
+          class: `preset-card${selected ? " selected" : ""}`,
+          "aria-pressed": selected ? "true" : "false",
+        },
+        swatch,
+        el("span", { class: "preset-name" }, preset.name),
+        el("span", { class: "preset-tagline" }, preset.tagline),
+        el("span", { class: "preset-cue" }, `${STY.getLayout(preset.defaultLayout).label} · ${preset.captionStyle}`),
+      );
+      card.addEventListener("click", () => renderNewShowForm(nameInput.value, null, preset.id));
+      presetGrid.appendChild(card);
+    });
+
+    const previewCard = el("section", { class: "card preview-card create-show-preview" }, el("h3", {}, "Preview"));
+    if (presets.length) {
+      previewCard.appendChild(buildShowStylePreview(selectedPresetId));
+    }
+
+    const styleField = presets.length
+      ? el(
+          "div",
+          { class: "field create-show-style-field" },
+          el("label", {}, "Start from a style preset"),
+          el(
+            "p",
+            { class: "hint" },
+            "Choose a visual look for this show — you can fine-tune layout and pacing later. The selected style carries into the episode.",
+          ),
+          el("div", { class: "style-layout create-show-style-layout" }, presetGrid, previewCard),
+        )
+      : null;
 
     const form = el(
       "div",
@@ -646,12 +737,7 @@
         el("label", { for: "f-show-name" }, "Show name"),
         nameInput,
       ),
-      el(
-        "div",
-        { class: "field" },
-        el("label", { for: "f-show-template" }, "Start from template (optional)"),
-        tplSelect,
-      ),
+      styleField,
       el(
         "p",
         { class: "hint" },
@@ -667,14 +753,12 @@
       const name = nameInput.value;
       const check = LIB.validateShowName(showLibrary, name);
       if (!check.ok) {
-        renderNewShowForm(name, check.error);
+        renderNewShowForm(name, check.error, selectedPresetId);
         return;
       }
-      const tpl = saved.find((t) => t.id === selectedTemplateId);
+      const preset = STY ? STY.getPreset(selectedPresetId) : null;
       const show = LIB.createShow(check.name, {
-        templateId: selectedTemplateId,
-        templateName: tpl ? tpl.name : "",
-        presetName: selectedPresetName,
+        presetName: preset ? preset.name : "",
       });
       showLibrary = LIB.addShow(showLibrary, show);
       persistShowLibrary();

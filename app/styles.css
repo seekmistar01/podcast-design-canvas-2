@@ -566,6 +566,34 @@ button.ghost:hover,
   line-height: 1.4;
 }
 
+.preset-cue {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--brand);
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+/* Create Show: visual preset cards + live preview (#94) */
+.create-show-style-field {
+  margin-top: 4px;
+}
+
+.create-show-style-layout {
+  align-items: start;
+}
+
+.create-show-preview {
+  margin: 0;
+}
+
+.create-show-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Live preview stage */
 .preview-stage {
   border-radius: 14px;
