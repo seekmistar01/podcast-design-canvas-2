@@ -203,6 +203,19 @@
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
+  function isWordChar(ch) {
+    return /[A-Za-z0-9]/.test(ch);
+  }
+
+  // Match a spelling hint only as a whole token so it never rewrites part of a longer,
+  // already-correct word. Word boundaries are added only on sides that end in a word
+  // character, so hints that contain punctuation (e.g. "Sam R.") still match cleanly.
+  function buildHintPattern(hint) {
+    const left = isWordChar(hint.charAt(0)) ? "\\b" : "";
+    const right = isWordChar(hint.charAt(hint.length - 1)) ? "\\b" : "";
+    return new RegExp(`${left}${escapeRegExp(hint)}${right}`, "gi");
+  }
+
   function applyHintsToText(text, review, speakerRole, speakerName) {
     const original = trim(text);
     if (!original || !review || !review.approved) {
@@ -212,12 +225,22 @@
     if (!ctx) {
       return original;
     }
+    const canonical = trim(ctx.displayName);
+    const canonicalLower = canonical.toLowerCase();
     let next = original;
-    ctx.spellingHints.forEach((hint) => {
-      if (!hint || hint.toLowerCase() === ctx.displayName.toLowerCase()) {
+    ctx.spellingHints.forEach((rawHint) => {
+      const hint = trim(rawHint);
+      if (!hint) {
         return;
       }
-      next = next.replace(new RegExp(escapeRegExp(hint), "gi"), ctx.displayName);
+      const hintLower = hint.toLowerCase();
+      // Never apply a hint that is the correct name, or that the correct name already
+      // contains: replacing it can only corrupt text that is already right — e.g. the
+      // auto-derived hint "Sam River" turning "Sam Rivera" into "Sam Riveraa".
+      if (hintLower === canonicalLower || canonicalLower.indexOf(hintLower) >= 0) {
+        return;
+      }
+      next = next.replace(buildHintPattern(hint), canonical);
     });
     return next;
   }

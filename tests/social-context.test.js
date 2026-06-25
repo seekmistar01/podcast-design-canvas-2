@@ -110,6 +110,39 @@ test("applyReviewToMoments fixes spellings and enriches captions, titles, and ca
   assert.ok(callout.text.includes("Rivera Media"));
 });
 
+test("applyHintsToText leaves already-correct names untouched (regression: Sam Rivera → Sam Riveraa)", () => {
+  // Default, unedited context: the auto-derived hints for "Sam Rivera" include the
+  // prefix-style "Sam River". Applying hints must never corrupt the correct spelling.
+  const review = context.approveReview(context.createReview(setup.summarize(draftWithSocial())));
+  assert.ok(review.speakers[0].spellingHints.includes("Sam River"));
+
+  assert.strictEqual(
+    context.applyHintsToText("Welcome back Sam Rivera", review, "Host", "Sam Rivera"),
+    "Welcome back Sam Rivera",
+  );
+  assert.strictEqual(
+    context.applyHintsToText("Sam Rivera on growth", review, "Host", "Sam Rivera"),
+    "Sam Rivera on growth",
+  );
+});
+
+test("applyHintsToText still fixes a genuine misspelling as a whole token", () => {
+  let review = context.createReview(setup.summarize(draftWithSocial()));
+  review = context.updateSpeaker(review, 0, { spellingHints: "Sam Rivira" });
+  review = context.approveReview(review);
+
+  // The real misspelling is corrected...
+  assert.strictEqual(
+    context.applyHintsToText("Sam Rivira on growth", review, "Host", "Sam Rivera"),
+    "Sam Rivera on growth",
+  );
+  // ...but a longer word that merely contains the hint is left alone.
+  assert.strictEqual(
+    context.applyHintsToText("Sam Riviras", review, "Host", "Sam Rivera"),
+    "Sam Riviras",
+  );
+});
+
 test("summarizeReview rolls approved context into an export-friendly line", () => {
   let review = context.approveReview(context.createReview(setup.summarize(draftWithSocial())));
   review = context.updateSpeaker(review, 0, { topics: "founders, SaaS" });
