@@ -397,6 +397,10 @@ button:disabled {
   max-width: 60ch;
 }
 
+.style-template-picker {
+  margin-bottom: 20px;
+}
+
 .style-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);

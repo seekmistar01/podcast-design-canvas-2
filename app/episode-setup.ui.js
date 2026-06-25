@@ -778,13 +778,17 @@
     if (!template) {
       return;
     }
-    canvasDoc = TM.applyTemplate(template);
+    // Re-seed the saved layout onto THIS episode's speakers so reuse keeps the current
+    // speaker assignments while carrying the show identity forward (#27).
+    canvasDoc = CE && summary ? CE.applyTemplateToEpisode(template, summary) : TM.applyTemplate(template);
     activeTemplateId = template.id;
     if (canvasDoc && STY) {
+      const sel = TM.selectionFromTemplate(template);
       styleSelection = styleSelection || STY.createSelection();
-      styleSelection.presetId = canvasDoc.presetId || styleSelection.presetId;
-      styleSelection.layout = canvasDoc.layoutId || styleSelection.layout;
-      styleSelection.pacing = canvasDoc.pacingId || styleSelection.pacing;
+      styleSelection.presetId = sel.presetId || styleSelection.presetId;
+      styleSelection.layout = sel.layout || styleSelection.layout;
+      styleSelection.pacing = sel.pacing || styleSelection.pacing;
+      layoutCustomized = Boolean(styleSelection.layout && styleSelection.layout !== "auto");
       appliedStyle = STY.summarizeStyle(styleSelection, summary ? summary.speakerCount : 3);
     }
     if (summary) {
@@ -1496,6 +1500,56 @@
         el("p", { class: "hint" }, "Start from a preset, then fine-tune layout and pacing. The preview uses your real speakers."),
       ),
     );
+
+    // Reusable show templates (#27): pick a saved show identity to start from. The
+    // saved layout/visual style is applied while this episode keeps its own speakers.
+    if (TM) {
+      const saved = TM.listTemplates(templateStore);
+      if (saved.length) {
+        const tplCard = el(
+          "section",
+          { class: "card style-template-picker" },
+          el("h3", {}, "Start from a saved show template"),
+          el(
+            "p",
+            { class: "hint" },
+            "Reuse a show identity you saved before. Your current speakers stay put — only the saved layout and visual style are applied.",
+          ),
+        );
+        const list = el("div", { class: "template-list" });
+        saved.forEach((item) => {
+          const row = el(
+            "div",
+            { class: `template-row${activeTemplateId === item.id ? " active" : ""}` },
+            el("span", { class: "template-row-name" }, item.name),
+            el(
+              "span",
+              { class: "template-row-meta" },
+              `${item.presetName || "Custom"} · ${item.titleText || "Untitled"}`,
+            ),
+          );
+          const useBtn = el(
+            "button",
+            { type: "button", class: "ghost" },
+            activeTemplateId === item.id ? "Applied ✓" : "Use this template",
+          );
+          useBtn.addEventListener("click", () => {
+            const sel = TM.selectionFromTemplate(TM.getTemplate(templateStore, item.id));
+            styleSelection = styleSelection || STY.createSelection();
+            styleSelection.presetId = sel.presetId || styleSelection.presetId;
+            styleSelection.layout = sel.layout || styleSelection.layout;
+            styleSelection.pacing = sel.pacing || styleSelection.pacing;
+            layoutCustomized = Boolean(styleSelection.layout && styleSelection.layout !== "auto");
+            activeTemplateId = item.id;
+            renderStyle(summary);
+          });
+          row.appendChild(useBtn);
+          list.appendChild(row);
+        });
+        tplCard.appendChild(list);
+        view.appendChild(tplCard);
+      }
+    }
 
     const layoutGrid = el("div", { class: "style-layout" });
 

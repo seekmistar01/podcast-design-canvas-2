@@ -87,6 +87,17 @@
     return cloneCanvas(template.canvas);
   }
 
+  // The style selection captured by a saved template, so it can be re-selected from the
+  // style step on a new episode (preset + layout + pacing) without the speaker frames.
+  function selectionFromTemplate(template) {
+    const canvas = (template && template.canvas) || {};
+    return {
+      presetId: canvas.presetId,
+      layout: canvas.layoutId || "auto",
+      pacing: canvas.pacingId || "balanced",
+    };
+  }
+
   function serializeStore(store) {
     return JSON.stringify(store || createStore());
   }
@@ -118,6 +129,7 @@
     listTemplates,
     getTemplate,
     applyTemplate,
+    selectionFromTemplate,
     serializeStore,
     deserializeStore,
     _resetTemplateCounter,

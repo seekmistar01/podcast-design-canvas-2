@@ -66,6 +66,28 @@
     };
   }
 
+  // Reuse a saved show template on a *different* episode (#27): keep the template's
+  // look (preset, layout, pacing, palette, layers, title) but re-seed the speaker
+  // frames from the current episode's assigned speakers so the show identity carries
+  // forward while the frames always match who is actually in this episode.
+  function applyTemplateToEpisode(template, episodeSummary) {
+    if (!template || !template.canvas) {
+      return null;
+    }
+    const STY = styleApi();
+    const doc = cloneDoc(template.canvas);
+    const episode = episodeSummary || {};
+    const selection = {
+      presetId: doc.presetId,
+      layout: doc.layoutId || "auto",
+      pacing: doc.pacingId || "balanced",
+    };
+    if (STY && Array.isArray(episode.speakers)) {
+      doc.speakerFrames = STY.buildPreviewFrames(episode.speakers, selection, episode.speakerCount);
+    }
+    return doc;
+  }
+
   function updateElement(doc, key, value) {
     const next = cloneDoc(doc || createFromStyle({}, {}, {}));
     if (key === "titleText" || key === "captionText" || key === "background" || key === "accent") {
@@ -113,6 +135,7 @@
 
   const api = {
     createFromStyle,
+    applyTemplateToEpisode,
     updateElement,
     updateLayers,
     summarize,
