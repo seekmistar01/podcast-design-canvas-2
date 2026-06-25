@@ -1283,3 +1283,92 @@ button:disabled {
   font-weight: 600;
   margin: 0 0 4px;
 }
+
+/* ---- Full-episode review & approval (#37) ---- */
+.review-step {
+  display: grid;
+  gap: 18px;
+}
+
+.review-banner {
+  border-left: 5px solid var(--line);
+}
+
+.review-banner-blocked {
+  border-left-color: var(--warn);
+}
+
+.review-banner-ready-with-warnings {
+  border-left-color: #a15c00;
+}
+
+.review-banner-ready {
+  border-left-color: var(--ok);
+}
+
+.review-banner-approved {
+  border-left-color: var(--ok);
+  background: #f3fbf7;
+}
+
+.review-banner-status {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.review-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.review-row:first-of-type {
+  border-top: none;
+}
+
+.review-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.review-badge {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.review-badge-ready {
+  background: rgba(31, 157, 107, 0.14);
+  color: var(--ok);
+}
+
+.review-badge-warn {
+  background: rgba(161, 92, 0, 0.14);
+  color: #a15c00;
+}
+
+.review-badge-missing {
+  background: rgba(200, 50, 74, 0.14);
+  color: var(--warn);
+}
+
+.review-row-label {
+  font-weight: 600;
+  display: block;
+}
+
+.review-row-detail {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}

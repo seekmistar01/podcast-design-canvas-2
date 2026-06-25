@@ -12,6 +12,7 @@
   const VM = window.PdcVisualMoments;
   const SC = window.PdcSocialContext;
   const EXP = window.PdcEpisodeExport;
+  const RV = window.PdcEpisodeReview;
   const root = document.getElementById("app");
   const stepPill = document.querySelector(".step-pill");
   if (!ES || !root) {
@@ -41,6 +42,9 @@
   const MOMENTS_STORAGE_KEY = "pdc-visual-moments";
   let contextReview = null;
   let contextApproved = false;
+  // Full-episode review & approval (#37): the assembled review and whether the creator
+  // has signed off on the publish-ready checklist.
+  let reviewApproved = false;
 
   function safeLoadMoments() {
     try {
@@ -790,6 +794,15 @@
     if (exportAvailable && exportReady) {
       actions.appendChild(exportButton);
     }
+    if (RV) {
+      const reviewButton = el(
+        "button",
+        { type: "button", class: exportReady && !exportJob ? "primary" : "ghost" },
+        reviewApproved ? "View approval →" : "Review & approve →",
+      );
+      reviewButton.addEventListener("click", () => renderReview(summary));
+      actions.appendChild(reviewButton);
+    }
     actions.appendChild(
       (function () {
         const back = el("button", { type: "button", class: "ghost" }, "← Edit setup");
@@ -818,6 +831,147 @@
         view.appendChild(renderSavedTemplatesCard(saved, summary));
       }
     }
+
+    root.appendChild(view);
+    view.scrollIntoView({ block: "start" });
+  }
+
+  // ---- Full-episode review & approval (#37) -----------------------------------
+
+  function gotoReviewStep(action, summary) {
+    if (action === "setup") {
+      showErrors = false;
+      renderSetup();
+      return;
+    }
+    if (action === "style") {
+      renderStyle(summary);
+      return;
+    }
+    if (action === "audio") {
+      if (AP && !audioPolish) {
+        audioPolish = AP.createPolish(summary);
+      }
+      renderAudioPolish(summary);
+      return;
+    }
+    if (action === "context" && SC) {
+      renderContextReview(summary);
+      return;
+    }
+    if (action === "moments" && VM) {
+      renderVisualMoments(summary);
+      return;
+    }
+    if (action === "export" && EXP) {
+      renderExport(summary);
+      return;
+    }
+    renderWorkspace(summary);
+  }
+
+  function reviewBannerLabel(status) {
+    if (status === "approved") return "Approved";
+    if (status === "blocked") return "Not ready";
+    if (status === "ready-with-warnings") return "Ready (with suggestions)";
+    return "Ready to approve";
+  }
+
+  function renderReview(summary) {
+    root.innerHTML = "";
+    setStep("Step 7 of 7 · Review & approve");
+    const result = RV.buildReview(summary, buildExportContext(summary));
+    // A change that breaks a required check invalidates a prior approval.
+    if (!result.canApprove) {
+      reviewApproved = false;
+    }
+
+    const view = el("div", { class: "review-step" });
+    view.appendChild(
+      el(
+        "div",
+        { class: "workspace-head" },
+        el("p", { class: "eyebrow" }, "Review & approve"),
+        el("h2", {}, `Final check for ${summary.episodeName}`),
+        el(
+          "p",
+          { class: "hint" },
+          "Confirm the whole episode is publish-ready. Fix anything flagged, then approve to send it to export.",
+        ),
+      ),
+    );
+
+    const status = reviewApproved ? "approved" : result.overallStatus;
+    const bannerText = reviewApproved
+      ? "Approved — this episode is signed off and ready to export."
+      : result.overallStatus === "blocked"
+        ? `Not ready yet — ${result.blockers.length} required item${result.blockers.length === 1 ? "" : "s"} still need attention.`
+        : result.warnings.length
+          ? `All required checks pass. ${result.warnings.length} optional improvement${result.warnings.length === 1 ? "" : "s"} you may still want.`
+          : "All checks pass — ready to approve.";
+    view.appendChild(
+      el(
+        "section",
+        { class: `card review-banner review-banner-${status}` },
+        el("p", { class: "review-banner-status" }, reviewBannerLabel(status)),
+        el("p", {}, bannerText),
+        el("p", { class: "hint" }, `${result.readyCount} of ${result.sectionCount} checks ready`),
+      ),
+    );
+
+    const list = el("section", { class: "card review-checklist" }, el("h3", {}, "Publish-ready checklist"));
+    result.sections.forEach((s) => {
+      const row = el("div", { class: `review-row review-${s.status}` });
+      row.appendChild(
+        el(
+          "div",
+          { class: "review-row-main" },
+          el("span", { class: `review-badge review-badge-${s.status}` }, RV.statusLabel(s.status)),
+          el(
+            "div",
+            { class: "review-row-text" },
+            el("span", { class: "review-row-label" }, s.label + (s.required ? " (required)" : "")),
+            el("p", { class: "review-row-detail" }, s.detail),
+          ),
+        ),
+      );
+      if (s.status !== "ready") {
+        const fix = el("button", { type: "button", class: "ghost canvas-tiny" }, "Fix");
+        fix.addEventListener("click", () => gotoReviewStep(s.action, summary));
+        row.appendChild(fix);
+      }
+      list.appendChild(row);
+    });
+    view.appendChild(list);
+
+    const actions = el("div", { class: "actions" });
+    if (!reviewApproved) {
+      const approveBtn = el(
+        "button",
+        { type: "button", class: "primary", disabled: result.canApprove ? null : true },
+        "Approve episode",
+      );
+      approveBtn.addEventListener("click", () => {
+        const outcome = RV.approveReview(result);
+        if (outcome.ok) {
+          reviewApproved = true;
+          renderReview(summary);
+        }
+      });
+      actions.appendChild(approveBtn);
+    } else if (EXP) {
+      const exportBtn = el(
+        "button",
+        { type: "button", class: "primary" },
+        exportJob && exportJob.status === "ready" ? "View export →" : "Export episode →",
+      );
+      exportBtn.addEventListener("click", () => renderExport(summary));
+      actions.appendChild(exportBtn);
+    }
+    const back = el("button", { type: "button", class: "ghost" }, "← Back to workspace");
+    back.addEventListener("click", () => renderWorkspace(summary));
+    actions.appendChild(back);
+    view.appendChild(el("section", { class: "card next-step" }, actions));
 
     root.appendChild(view);
     view.scrollIntoView({ block: "start" });
