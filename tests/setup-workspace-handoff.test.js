@@ -66,12 +66,13 @@ test("ACCEPTANCE: preset-first probe path validates and produces workspace hando
   assert.strictEqual(completion.presetSummary, presetSummary);
   assert.ok(completion.roleSummary.includes("Host"));
   assert.ok(completion.roleSummary.includes("Guest 1"));
-  assert.ok(completion.handoff.sourceDetail.includes("riverside.fm"));
+  assert.strictEqual(completion.handoff.sourceDetail, "Riverside recording link ready");
 
   const ws = workspace.buildWorkspace(summary, { contextApproved: false });
   const setupStage = workspace.getStage(ws, "setup");
   assert.ok(setupStage.summary.includes("Host"));
-  assert.ok(setupStage.summary.includes("riverside.fm"));
+  assert.ok(setupStage.summary.includes("Riverside recording link ready"));
+  assert.ok(!/canvas demo/i.test(setupStage.summary));
 });
 
 test("ACCEPTANCE: preset selection completes sandbox handoff without manual Continue input", () => {
@@ -83,7 +84,7 @@ test("ACCEPTANCE: preset selection completes sandbox handoff without manual Cont
   assert.strictEqual(completion.completionEyebrow, "Setup complete");
   assert.ok(completion.presetSummary.length > 0);
   assert.ok(completion.roleSummary.includes("Host"));
-  assert.ok(completion.handoff.sourceDetail.includes("riverside.fm"));
+  assert.strictEqual(completion.handoff.sourceDetail, "Riverside recording link ready");
 });
 
 test("ACCEPTANCE: riverside-only path still completes setup handoff recap", () => {

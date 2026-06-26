@@ -36,9 +36,18 @@
     };
   }
 
+  function setupApi() {
+    if (typeof module !== "undefined" && module.exports && typeof require === "function") {
+      return require("./episode-setup.js");
+    }
+    const g = typeof window !== "undefined" ? window : globalThis;
+    return g.PdcEpisodeSetup;
+  }
+
   function buildStages(episodeSummary, ctx) {
     const episode = episodeSummary || {};
     const context = ctx || {};
+    const setup = setupApi();
     const stages = [];
 
     // Setup -------------------------------------------------------------------
@@ -47,11 +56,17 @@
     if (setupComplete) {
       const parts = [];
       if (episode.riversideLink) {
-        parts.push(`${episode.sourceModeLabel || "Riverside link"}: ${episode.riversideLink}`);
+        const sourceDetail = setup && setup.handoffSourceDetail
+          ? setup.handoffSourceDetail(episode)
+          : episode.riversideLink;
+        parts.push(`${episode.sourceModeLabel || "Riverside link"}: ${sourceDetail}`);
       } else if (episode.sourceModeLabel) {
         parts.push(episode.sourceModeLabel);
       }
       const identities = (episode.speakers || []).map(function (speaker) {
+        if (setup && setup.handoffIdentityLine) {
+          return setup.handoffIdentityLine(speaker.name, speaker.role);
+        }
         return speaker.name ? `${speaker.name} (${speaker.role})` : speaker.role;
       }).filter(Boolean);
       if (identities.length) {

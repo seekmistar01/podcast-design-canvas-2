@@ -297,6 +297,37 @@
     return "https://riverside.fm/studio/podcast-canvas-demo";
   }
 
+  function isSandboxDemoRiversideLink(link) {
+    return trim(link) === sandboxDemoRiversideLink();
+  }
+
+  // Creator-facing speaker label for setup recap and workspace summaries.
+  function handoffIdentityLine(name, role) {
+    const safeName = trim(name);
+    const safeRole = trim(role);
+    if (!safeName || safeName === safeRole) {
+      return safeRole;
+    }
+    return `${safeName} · ${safeRole}`;
+  }
+
+  // Hide internal sandbox/demo URLs from setup handoff while keeping real links visible.
+  function handoffSourceDetail(data) {
+    const summary = data && typeof data === "object" ? data : {};
+    const mode = normalizeMode(summary.sourceMode);
+    if (mode === "riverside") {
+      const link = trim(summary.riversideLink);
+      if (!link) {
+        return "Riverside recording link saved";
+      }
+      if (isSandboxDemoRiversideLink(link)) {
+        return "Riverside recording link ready";
+      }
+      return link;
+    }
+    return "Synced speaker files attached per bucket";
+  }
+
   // When a creator picks a preset but has not pasted a Riverside link yet, attach a
   // review-friendly demo link so Continue can complete setup (same spirit as placeholder files).
   function applySandboxHandoffSource(draft) {
@@ -348,9 +379,7 @@
     const data = summary && typeof summary === "object" ? summary : {};
     const mode = normalizeMode(data.sourceMode);
     const speakers = Array.isArray(data.speakers) ? data.speakers : [];
-    const sourceDetail = mode === "riverside"
-      ? trim(data.riversideLink) || "Riverside recording link saved"
-      : "Synced speaker files attached per bucket";
+    const sourceDetail = handoffSourceDetail(data);
 
     return {
       confirmationLead: "Your imported sources, speaker buckets, and social context are saved and driving this episode setup.",
@@ -361,9 +390,7 @@
         return {
           role: trim(speaker.role),
           name: trim(speaker.name),
-          identityLine: trim(speaker.name)
-            ? `${trim(speaker.name)} · ${trim(speaker.role)}`
-            : trim(speaker.role),
+          identityLine: handoffIdentityLine(speaker.name, speaker.role),
           sourceLabel: trim(speaker.sourceLabel) || sourceLabel(mode, speaker),
           social,
           socialLine: social.length
@@ -415,6 +442,9 @@
     importSocialContextCueLine,
     defaultImportShowName,
     sandboxDemoRiversideLink,
+    isSandboxDemoRiversideLink,
+    handoffIdentityLine,
+    handoffSourceDetail,
     applySandboxHandoffSource,
     prepareSandboxPresetHandoff,
     canApplyImportContinueDefaults,

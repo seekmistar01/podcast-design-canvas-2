@@ -49,7 +49,8 @@ test("ACCEPTANCE: workspace handoff separates recap, primary action, and grouped
   assert.ok(current.actionLabel.length > 0);
   assert.strictEqual(ws.stages.filter((stage) => stage.status === "complete").length, 2);
   const completion = setup.buildSetupCompletionHandoff(summary, { presetSummary: "Studio Spotlight" });
-  assert.ok(completion.handoff.sourceDetail.includes("riverside.fm"));
+  assert.strictEqual(completion.handoff.sourceDetail, "Riverside recording link ready");
+  assert.ok(!/canvas demo/i.test(completion.handoff.sourceDetail));
 });
 
 console.log(`\nsummary handoff polish: ${passed} assertions passed`);

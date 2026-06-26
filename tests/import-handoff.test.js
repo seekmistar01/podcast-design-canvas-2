@@ -67,7 +67,7 @@ test("workspace setup stage summary names imported speakers and source", () => {
   const ws = workspace.buildWorkspace(episode, { contextApproved: false });
   const setupStage = workspace.getStage(ws, "setup");
 
-  assert.ok(setupStage.summary.includes("Sam Rivera (Host)"));
+  assert.ok(setupStage.summary.includes("Sam Rivera · Host"));
   assert.ok(setupStage.summary.includes("riverside.fm"));
   assert.ok(setupStage.summary.includes("2 social links saved"));
   assert.ok(setupStage.summary.includes("context ready to review"));
@@ -125,8 +125,38 @@ test("ACCEPTANCE: completing import produces workspace handoff data and blocks i
   assert.strictEqual(completion.completionEyebrow, "Setup complete");
   assert.strictEqual(completion.handoff.speakers.length, 3);
   assert.ok(completion.handoff.speakers.every((speaker) => speaker.role && speaker.sourceLabel));
-  assert.ok(completion.handoff.sourceDetail.includes("riverside.fm"));
-  assert.ok(completion.roleSummary.includes("Host"));
+  assert.strictEqual(completion.handoff.sourceDetail, "https://riverside.fm/studio/probe-path");
+  assert.strictEqual(completion.roleSummary, "Host · Guest 1 · Guest 2");
+  assert.ok(!/canvas demo/i.test(completion.handoff.sourceDetail));
+  assert.ok(!/Host · Host/.test(completion.roleSummary));
+});
+
+test("ACCEPTANCE: sandbox preset handoff shows canonical speaker buckets without demo URL text", () => {
+  const ready = setup.prepareSandboxPresetHandoff(setup.createDraft(), "My Show");
+  ready.speakers[0].name = "Alex Chen";
+  ready.speakers[1].name = "Jordan Lee";
+  ready.speakers[2].name = "Priya Shah";
+  const completion = setup.buildSetupCompletionHandoff(setup.summarize(ready), {
+    presetSummary: "Split Stage",
+  });
+
+  assert.strictEqual(completion.handoff.speakers.length, 3);
+  assert.strictEqual(completion.handoff.sourceDetail, "Riverside recording link ready");
+  assert.ok(!/canvas demo/i.test(completion.handoff.sourceDetail));
+  assert.strictEqual(
+    completion.roleSummary,
+    "Alex Chen · Host · Jordan Lee · Guest 1 · Priya Shah · Guest 2",
+  );
+  assert.deepStrictEqual(
+    completion.handoff.speakers.map((speaker) => speaker.identityLine),
+    ["Alex Chen · Host", "Jordan Lee · Guest 1", "Priya Shah · Guest 2"],
+  );
+
+  const ws = workspace.buildWorkspace(setup.summarize(ready), { contextApproved: false });
+  const setupStage = workspace.getStage(ws, "setup");
+  assert.ok(setupStage.summary.includes("Alex Chen · Host"));
+  assert.ok(setupStage.summary.includes("Riverside recording link ready"));
+  assert.ok(!/canvas demo/i.test(setupStage.summary));
 });
 
 console.log(`\nimport handoff: ${passed} assertions passed`);
